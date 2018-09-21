@@ -1,0 +1,89 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using MLAgents;
+
+public class PlateRobotAgent : Agent {
+
+    public Transform body0;
+    public Transform body1;
+    public Transform body2;
+    JointDriveController jdController;
+    bool isNewDecisionStep;
+    int currentDecisionStep;
+
+
+    public override void InitializeAgent()
+    {
+        jdController = GetComponent<JointDriveController>();
+        jdController.SetupBodyPart(body0);
+        jdController.SetupBodyPart(body1);
+        jdController.SetupBodyPart(body2);
+
+    }
+
+    public void CollectObservationBodyPart(BodyPart bp)
+    {
+        if(bp.rb.transform != body0)
+        {
+        AddVectorObs(bp.currentZNormalizedRot);
+        }
+    }
+
+    public override void CollectObservations()
+    {
+        jdController.GetCurrentJointForces();
+
+        foreach (var bodyPart in jdController.bodyPartsDict.Values)
+        {
+            CollectObservationBodyPart(bodyPart);
+        }
+    }
+
+    public override void AgentAction(float[] vectorAction, string textAction)
+	{
+        if (isNewDecisionStep)
+        {
+            var bpDict = jdController.bodyPartsDict;
+            int i = -1;
+
+            bpDict[body1].SetJointTargetRotation(0,0,vectorAction[++i]);
+            bpDict[body2].SetJointTargetRotation(0,0,vectorAction[++i]);
+            bpDict[body1].SetJointStrength(vectorAction[++i]);
+            bpDict[body2].SetJointStrength(vectorAction[++i]);
+        }
+
+        IncrementDecisionTimer();
+
+        AddReward(
+            +0.05f * body1.position.x 
+                );
+
+    }
+
+    public void IncrementDecisionTimer()
+    {
+        if(currentDecisionStep == agentParameters.numberOfActionsBetweenDecisions ||
+           agentParameters.numberOfActionsBetweenDecisions == 1)
+        {
+            currentDecisionStep = 1;
+            isNewDecisionStep = true;
+        }
+        else
+        {
+            currentDecisionStep++;
+            isNewDecisionStep = false;
+        }
+    }
+
+    public override void AgentReset()
+    {
+        foreach (var bodyPart in jdController.bodyPartsDict.Values)
+        {
+            bodyPart.Reset(bodyPart);
+        }
+
+        isNewDecisionStep = true;
+        currentDecisionStep = 1;
+    }
+}

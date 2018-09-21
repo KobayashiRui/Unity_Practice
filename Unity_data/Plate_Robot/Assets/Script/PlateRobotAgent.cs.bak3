@@ -1,0 +1,172 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using MLAgents;
+
+public class PlateRobotAgent : Agent {
+
+    public GameObject body0;
+    public GameObject body1;
+    public GameObject body2;
+
+    HingeJoint jointbody1;
+    HingeJoint jointbody2;
+
+//float currentPoslist = new List<float>(){0.0f,0.0f};
+    //float[] currentPoslist = new float[]{0.0f, 0.0f};
+    public float currentposbody1;
+    public float currentposbody2;
+
+    float targetPositionjointbody1;//body1の角度の目的角度
+    float targetPositionjointbody2;//body2の角度の目的角度
+
+    Vector3 body0_init;
+    Vector3 body1_init;
+    Vector3 body2_init;
+    Quaternion rbody0_init;
+    Quaternion rbody1_init;
+    Quaternion rbody2_init;
+
+    float beforeTime;
+
+    bool isNewDecisionStep;
+    int currentDecisionStep;
+    int flag;
+    int step;
+    float old_pos_x;
+
+
+    public override void InitializeAgent()
+    {
+        Debug.Log("InitializeAgent");
+        jointbody1 = body1.GetComponent<HingeJoint>();
+        jointbody2 = body2.GetComponent<HingeJoint>();
+        body1_init = body1.transform.position;
+        body2_init = body2.transform.position;
+        body0_init = body0.transform.position;
+        rbody1_init = body1.transform.rotation;
+        rbody2_init = body2.transform.rotation;
+        rbody0_init = body0.transform.rotation;
+        targetPositionjointbody1 = 0.0f;
+        targetPositionjointbody2 = 0.0f;
+        currentposbody1 = 0.0f;
+        currentposbody2 = 0.0f;
+        beforeTime = Time.time;
+        flag = 0;
+        step = 0;
+        old_pos_x = body1.transform.position.x;
+    }
+
+    //状態を取得する(Stateの取得時に呼ばれる)
+    public override void CollectObservations()
+    {
+        AddVectorObs(1);
+        
+    }
+
+    public void FixedUpdate()
+    {
+        Debug.Log(step);
+        float diffPosition = (Time.time-beforeTime) * 100.0f; //dt * dw という感じ
+        beforeTime = Time.time;
+        if(Mathf.Abs((targetPositionjointbody1*90.0f)  - currentposbody1) < diffPosition){
+            this.currentposbody1 = targetPositionjointbody1 * 90.0f;
+        }else{
+            if(targetPositionjointbody1*90.0f < currentposbody1){
+                this.currentposbody1 -= diffPosition; 
+            }else{
+                this.currentposbody1 += diffPosition;
+            }
+        }
+
+        if(Mathf.Abs((targetPositionjointbody2*90.0f) - currentposbody2) < diffPosition){
+            this.currentposbody2 = targetPositionjointbody2 * 90.0f;
+        }else{
+        //Debug.Log("id");
+        //Debug.Log(i);
+            if(targetPositionjointbody2*90.0f < currentposbody2){
+                this.currentposbody2 -= diffPosition; 
+            }else{
+                this.currentposbody2 += diffPosition;
+            }
+        }
+        MoveJoint();
+        if(flag >= 200)
+        {
+            RequestDecision();
+            step++;
+        }else{
+            flag++;
+        }
+    }
+
+    //ステップ時に呼ばれる// RequestDecision()が呼ばれたときのみ
+    public override void AgentAction(float[] vectorAction, string textAction)
+	{
+        float reward = body1.transform.position.x - old_pos_x;
+        old_pos_x = body1.transform.position.x;
+        targetPositionjointbody1 = vectorAction[0];
+        targetPositionjointbody2 = vectorAction[1];
+
+        //Debug.Log(reward);
+        if(step >= 50){
+            Done();
+        }
+        AddReward(reward);//報酬を追加
+        flag=0;
+    }
+
+    public void SetHinge(float targetPos,int i){
+        //Debug.Log("targetpos");
+        //Debug.Log(targetPos);
+        if(i == 0){
+        }else if(i == 1){
+        Debug.Log("id");
+        Debug.Log(i);
+        }
+    }
+
+    public void MoveJoint(){
+
+        JointSpring hingeSpring2 = jointbody2.spring;
+        hingeSpring2.targetPosition = currentposbody2;
+        jointbody2.spring = hingeSpring2;
+
+        JointSpring hingeSpring1 = jointbody1.spring;
+        hingeSpring1.targetPosition = currentposbody1;//currentPoslist[0];
+        jointbody1.spring = hingeSpring1;
+    }
+
+    public void MoveJoint_init(){
+
+        JointSpring hingeSpring2 = jointbody2.spring;
+        hingeSpring2.targetPosition = 0;
+        jointbody2.spring = hingeSpring2;
+
+        JointSpring hingeSpring1 = jointbody1.spring;
+        hingeSpring1.targetPosition = 0;//currentPoslist[0];
+        jointbody1.spring = hingeSpring1;
+    }
+
+
+    //リセット時に呼ばれる
+    public override void AgentReset()
+    {
+        MoveJoint_init();
+        body0.transform.position = body0_init;
+        body0.transform.rotation = rbody0_init;
+        body1.transform.position = body1_init;
+        body1.transform.rotation = rbody1_init;
+        body2.transform.position = body2_init;
+        body2.transform.rotation = rbody2_init;
+        targetPositionjointbody1 = 0.0f;
+        targetPositionjointbody2 = 0.0f;
+        currentposbody1 = 0.0f;
+        currentposbody2 = 0.0f;
+        beforeTime = Time.time;
+        flag = 0;
+        step = 0;
+        old_pos_x = body1.transform.position.x;
+        Debug.Log("Reset");
+    }
+}
